@@ -1,0 +1,26 @@
+set_raw_dp:
+  name: Set raw DPS value
+  description: >-
+    Sends a raw Tuya datapoint value directly to the device. Intended for
+    reverse-engineering the unconfirmed DPs (107-113) - watch the Raw DPS
+    diagnostic sensor while calling this to see the effect.
+  fields:
+    entry_id:
+      name: Config entry ID
+      description: The config entry ID of the Fancy LED device to target.
+      required: true
+      selector:
+        text:
+    dp:
+      name: Datapoint number
+      description: The DP id as a string, e.g. "107".
+      required: true
+      example: "107"
+      selector:
+        text:
+    value:
+      name: Value
+      description: The value to send. Type depends on the datapoint (bool/int/string).
+      required: true
+      selector:
+        text:
