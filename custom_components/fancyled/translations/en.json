@@ -3,7 +3,7 @@
     "step": {
       "user": {
         "title": "Add Fancy LED device",
-        "description": "Enter the local network details for your FancyLEDs HDMI sync box. You need the device_id and local_key from the Tuya IoT Cloud developer portal (see the integration README for step-by-step instructions).",
+        "description": "Enter the local network details for your FancyLEDs HDMI sync box. You need the device_id and local_key from the [Tuya IoT Cloud developer portal](https://iot.tuya.com) - see the [README](https://github.com/ewagsjr/ha-fancyled#getting-your-local_key-and-device_id) for step-by-step instructions.",
         "data": {
           "name": "Name",
           "host": "IP address",
