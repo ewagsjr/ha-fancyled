@@ -28,24 +28,21 @@ _LOGGER = logging.getLogger(__name__)
 MIN_KELVIN = 2700
 MAX_KELVIN = 6500
 
-# Tuya "colour_data_v2" DP format: 6 hex RGB + 4 hex H(0-360) + 4 hex S(0-1000) + 4 hex V(0-1000)
+# This FancyLED controller uses Tuya's 12-character HSV payload:
+# 4 hex H (0-360) + 4 hex S (0-1000) + 4 hex V (0-1000).
 def _decode_color(raw: str) -> tuple[float, float]:
-    """Return (hue 0-360, saturation 0-100) from a colour_data_v2 hex string."""
-    h = int(raw[6:10], 16)
-    s = int(raw[10:14], 16)
+    """Return (hue 0-360, saturation 0-100) from a Tuya HSV string."""
+    h = int(raw[0:4], 16)
+    s = int(raw[4:8], 16)
     return (float(h), s / 10.0)
 
 
 def _encode_color(hue: float, saturation: float, value: int) -> str:
-    """Build a colour_data_v2 hex string from HSV (h 0-360, s 0-100, v 0-1000)."""
-    import colorsys
-
-    r, g, b = colorsys.hsv_to_rgb(hue / 360, saturation / 100, 1.0)
-    rgb_hex = f"{int(r * 255):02x}{int(g * 255):02x}{int(b * 255):02x}"
-    h_hex = f"{int(hue):04x}"
-    s_hex = f"{int(saturation * 10):04x}"
-    v_hex = f"{int(value):04x}"
-    return rgb_hex + h_hex + s_hex + v_hex
+    """Build the device's 12-character Tuya HSV string."""
+    h = max(0, min(360, round(hue)))
+    s = max(0, min(1000, round(saturation * 10)))
+    v = max(0, min(1000, round(value)))
+    return f"{h:04x}{s:04x}{v:04x}"
 
 
 async def async_setup_entry(
@@ -98,9 +95,13 @@ class FancyLedLight(CoordinatorEntity[FancyLedCoordinator], LightEntity):
     @property
     def hs_color(self) -> tuple[float, float] | None:
         raw = self._dps.get(DP_COLOR_DATA)
-        if not raw or len(raw) < 14:
+        if not isinstance(raw, str) or len(raw) < 12:
             return None
-        return _decode_color(raw)
+        try:
+            return _decode_color(raw)
+        except ValueError:
+            _LOGGER.warning("Invalid FancyLED color payload: %r", raw)
+            return None
 
     @property
     def color_temp_kelvin(self) -> int | None:

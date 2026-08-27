@@ -23,7 +23,13 @@ from .const import (
 
 _LOGGER = logging.getLogger(__name__)
 
-PLATFORMS: list[Platform] = [Platform.LIGHT, Platform.SELECT, Platform.SENSOR]
+PLATFORMS: list[Platform] = [
+    Platform.LIGHT,
+    Platform.NUMBER,
+    Platform.SELECT,
+    Platform.SENSOR,
+    Platform.SWITCH,
+]
 
 SERVICE_SET_RAW_DP = "set_raw_dp"
 SET_RAW_DP_SCHEMA = vol.Schema(
@@ -51,14 +57,20 @@ class FancyLedCoordinator(DataUpdateCoordinator[dict]):
         result = await self.hass.async_add_executor_job(self.device.status)
         if not result or "dps" not in result:
             raise UpdateFailed(f"Unexpected response from device: {result}")
-        return result["dps"]
+        # Persistent TinyTuya connections can report only the datapoints that
+        # changed since the previous response. Preserve the last full state so
+        # an animated scene updating DP25 does not make power, mode, and the
+        # other entities temporarily disappear.
+        return {**(self.data or {}), **result["dps"]}
 
     async def async_set_dp(self, dp: str, value) -> None:
         await self.hass.async_add_executor_job(self.device.set_value, dp, value)
+        self.async_set_updated_data({**(self.data or {}), dp: value})
         await self.async_request_refresh()
 
     async def async_set_multiple(self, values: dict) -> None:
         await self.hass.async_add_executor_job(self.device.set_multiple_values, values)
+        self.async_set_updated_data({**(self.data or {}), **values})
         await self.async_request_refresh()
 
 
@@ -71,7 +83,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         address=entry.data[CONF_HOST],
         local_key=entry.data[CONF_LOCAL_KEY],
         version=float(entry.data[CONF_PROTOCOL_VERSION]),
-        persist=True,
+        # Persistent TinyTuya sockets can replay queued older updates after a
+        # command (for example, reporting DP107 off after Sync is already on).
+        # A fresh LAN request gives a complete, current DPS snapshot.
+        persist=False,
     )
 
     coordinator = FancyLedCoordinator(hass, device)
