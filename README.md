@@ -2,11 +2,18 @@
 
 A local-only Home Assistant custom integration for the **FancyLEDs HDMI sync box** (the ambient TV backlight strip controlled by the *Fancyleds* iOS/Android app). Communicates directly over your LAN using the Tuya local protocol (v3.4) — no cloud dependency after initial setup.
 
+Polling uses a fresh local Tuya connection for each request so HA reports the
+box's current state instead of queued updates from an older command. Partial
+DPS responses are still merged defensively with the last complete state, and
+successful writes are reflected optimistically until the next physical poll.
+
 ## Status
 
-Core functionality (power, brightness, RGB color, color temperature, work mode, HDMI input) is implemented against the DPS map reverse-engineered in [make-all/tuya-local#3664](https://github.com/make-all/tuya-local/issues/3664). A handful of datapoints (DP107-113: sensitivity / HDR / TV-sync / color enhancement) are **not yet mapped** — see [Extending](#extending-unmapped-datapoints) below.
+Core functionality (power, brightness, RGB color, color temperature, 12 app scene presets, three HDMI Sync modes, Sync sensitivity, work mode, and HDMI input) is implemented against the DPS map reverse-engineered in [make-all/tuya-local#3664](https://github.com/make-all/tuya-local/issues/3664) and verified against a live device. A handful of datapoints (DP109-113: CEC / HDR / color enhancement) are **not yet mapped** — see [Extending](#extending-unmapped-datapoints) below.
 
-This has not yet been verified end-to-end against real hardware. Please open an issue with what works/doesn't on your unit.
+The scene presets, HDMI Sync modes, sensitivity control, color payload, and
+non-persistent polling behavior were verified end-to-end on one protocol 3.4
+FancyLEDs sync box. Please open an issue with results from other hardware revisions.
 
 ## Why local control instead of the Fancyleds app / Tuya cloud?
 
@@ -51,12 +58,16 @@ Copy `custom_components/fancyled` into your Home Assistant `config/custom_compon
 
 - **Light** — on/off, brightness, RGB color, color temperature (mode switches automatically between HS and color-temp based on the device's work mode)
 - **Select: Work Mode** — white / colour / scene / music
-- **Select: HDMI Input** — best-guess options (`1`/`2`/`3`); verify against your unit (see below)
+- **Select: HDMI Input** — raw device options (`0`/`1`/`2`/`3`); verify against your unit (see below)
+- **Select: Scene** — Rainbow / Fire / Calm / Fireworks / Star / Rain / Atom / Smooth / Bounce / Kinetic / Breathe / Color
+- **Select: Sync Mode** — Low / Medium / High; selecting one enables Sync
+- **Number: Sync Sensitivity** — 0–100%; defaults to 65% when Sync is enabled
+- **Switch: HDMI Sync** — enables High Sync at 65% using DP25 + DP108 + DP107
 - **Sensor: Raw DPS** (diagnostic) — every raw datapoint as attributes, for debugging and reverse-engineering
 
 ## Extending unmapped datapoints
 
-DP107 through DP113 control sensitivity, HDR, TV-sync, and color enhancement in the app, but the exact per-DP meaning wasn't confirmed upstream. To map them:
+DP109 through DP113 control CEC, HDR, and color-enhancement settings in the app, but their exact per-DP meanings have not been confirmed. To map them:
 
 1. Watch the **Raw DPS** diagnostic sensor's attributes in Home Assistant's dev tools (Developer Tools → States).
 2. Toggle one setting at a time in the Fancyleds app and note which DP number changes and what values it takes.
