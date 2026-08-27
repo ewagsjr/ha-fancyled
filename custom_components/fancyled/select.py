@@ -14,8 +14,15 @@ from .const import (
     CONF_DEVICE_ID,
     DOMAIN,
     DP_HDMI_INPUT,
+    DP_HDMI_SYNC,
+    DP_POWER,
+    DP_SCENE_DATA,
+    DP_SYNC_SENSITIVITY,
     DP_WORK_MODE,
+    DEFAULT_SYNC_SENSITIVITY,
     HDMI_INPUT_OPTIONS,
+    SCENE_MODES,
+    SYNC_MODES,
     WORK_MODES,
 )
 
@@ -27,6 +34,8 @@ async def async_setup_entry(
     async_add_entities(
         [
             FancyLedWorkModeSelect(coordinator, entry),
+            FancyLedSceneSelect(coordinator, entry),
+            FancyLedSyncModeSelect(coordinator, entry),
             FancyLedHdmiInputSelect(coordinator, entry),
         ]
     )
@@ -73,19 +82,12 @@ class FancyLedHdmiInputSelect(_BaseSelect):
     """
 
     _attr_translation_key = "hdmi_input"
+    _attr_options = HDMI_INPUT_OPTIONS
 
     def __init__(self, coordinator: FancyLedCoordinator, entry: ConfigEntry) -> None:
         super().__init__(coordinator, entry)
         self._attr_unique_id = f"{entry.data[CONF_DEVICE_ID]}_hdmi_input"
         self._attr_name = f"{entry.data[CONF_NAME]} HDMI Input"
-
-    @property
-    def options(self) -> list[str]:
-        current = str((self.coordinator.data or {}).get(DP_HDMI_INPUT, ""))
-        opts = list(HDMI_INPUT_OPTIONS)
-        if current and current not in opts:
-            opts.append(current)
-        return opts
 
     @property
     def current_option(self) -> str | None:
@@ -94,3 +96,57 @@ class FancyLedHdmiInputSelect(_BaseSelect):
 
     async def async_select_option(self, option: str) -> None:
         await self.coordinator.async_set_dp(DP_HDMI_INPUT, option)
+
+
+class FancyLedSceneSelect(_BaseSelect):
+    """Select one of the scene presets exposed by the FancyLEDs app."""
+
+    _attr_options = list(SCENE_MODES)
+    _payload_to_scene = {payload: name for name, payload in SCENE_MODES.items()}
+
+    def __init__(self, coordinator: FancyLedCoordinator, entry: ConfigEntry) -> None:
+        super().__init__(coordinator, entry)
+        self._attr_unique_id = f"{entry.data[CONF_DEVICE_ID]}_scene"
+        self._attr_name = f"{entry.data[CONF_NAME]} Scene"
+
+    @property
+    def current_option(self) -> str | None:
+        payload = (self.coordinator.data or {}).get(DP_SCENE_DATA)
+        return self._payload_to_scene.get(payload)
+
+    async def async_select_option(self, option: str) -> None:
+        await self.coordinator.async_set_multiple(
+            {
+                DP_POWER: True,
+                DP_WORK_MODE: "colour",
+                DP_HDMI_SYNC: False,
+                DP_SCENE_DATA: SCENE_MODES[option],
+            }
+        )
+
+
+class FancyLedSyncModeSelect(_BaseSelect):
+    """Select and enable a video-reactive HDMI Sync profile."""
+
+    _attr_options = list(SYNC_MODES)
+    _payload_to_mode = {payload: name for name, payload in SYNC_MODES.items()}
+
+    def __init__(self, coordinator: FancyLedCoordinator, entry: ConfigEntry) -> None:
+        super().__init__(coordinator, entry)
+        self._attr_unique_id = f"{entry.data[CONF_DEVICE_ID]}_sync_mode"
+        self._attr_name = f"{entry.data[CONF_NAME]} Sync Mode"
+
+    @property
+    def current_option(self) -> str | None:
+        payload = (self.coordinator.data or {}).get(DP_SCENE_DATA)
+        return self._payload_to_mode.get(payload)
+
+    async def async_select_option(self, option: str) -> None:
+        await self.coordinator.async_set_multiple(
+            {
+                DP_POWER: True,
+                DP_SCENE_DATA: SYNC_MODES[option],
+                DP_SYNC_SENSITIVITY: DEFAULT_SYNC_SENSITIVITY,
+                DP_HDMI_SYNC: True,
+            }
+        )
